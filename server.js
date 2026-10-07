@@ -14,6 +14,7 @@ const MODEL = process.env.OPENAI_MODEL || 'gpt-6-luna';
 const jobs = new Map();
 
 const client = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+console.log(`OPENAI_API_KEY configured: ${Boolean(client)}`);
 if (!client) console.warn('OPENAI_API_KEY is not set. AI requests will fail until it is configured.');
 
 app.use(cors());
