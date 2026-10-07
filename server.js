@@ -9,6 +9,7 @@ const port = Number(process.env.PORT || 8080);
 const MAX_ROWS = Number(process.env.MAX_ROWS || 1000);
 const CONCURRENCY = Math.max(1, Number(process.env.CONCURRENCY || 5));
 const MAX_RETRIES = Math.max(0, Number(process.env.MAX_RETRIES || 3));
+const JOB_TTL_MS = Math.max(60000, Number(process.env.JOB_TTL_MS || 30 * 60 * 1000));
 const MODEL = process.env.OPENAI_MODEL || 'gpt-6-luna';
 const jobs = new Map();
 
@@ -25,6 +26,14 @@ const transient = err => {
 };
 
 function cleanText(v) { return String(v ?? '').trim(); }
+function cleanupJobs() {
+  const cutoff = Date.now() - JOB_TTL_MS;
+  for (const [id, job] of jobs) {
+    const timestamp = Date.parse(job.finishedAt || job.createdAt || '') || 0;
+    if (timestamp && timestamp < cutoff) jobs.delete(id);
+  }
+}
+setInterval(cleanupJobs, Math.min(JOB_TTL_MS, 5 * 60 * 1000)).unref();
 
 async function generateOne(item, platform, language) {
   if (!client) throw new Error('OPENAI_API_KEY is not configured on the server');
@@ -92,7 +101,8 @@ async function processJob(job) {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, job.items.length) }, worker));
   job.results = results.filter(Boolean);
   job.failed = failed.sort((a,b) => a.index - b.index);
-  job.status = 'completed';
+  job.status = job.failed.length === job.total ? 'failed' : 'completed';
+  if (job.status === 'failed') job.error = 'All products failed after retries.';
   job.finishedAt = new Date().toISOString();
 }
 
@@ -113,6 +123,7 @@ app.post('/api/generate', async (req, res) => {
 app.post('/api/bulk', (req, res) => {
   const { items, platform = 'Shopify', language = 'English' } = req.body || {};
   if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'items must be a non-empty array' });
+  if (!items.every(item => item && typeof item === 'object' && !Array.isArray(item))) return res.status(400).json({ error: 'Each item must be an object.' });
   if (items.length > MAX_ROWS) return res.status(400).json({ error: `Maximum ${MAX_ROWS} products per job.` });
   const id = crypto.randomUUID();
   const job = { id, status: 'queued', total: items.length, completed: 0, items, platform, language, results: [], failed: [], createdAt: new Date().toISOString() };
