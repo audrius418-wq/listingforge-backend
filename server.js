@@ -96,7 +96,9 @@ async function processJob(job) {
   job.finishedAt = new Date().toISOString();
 }
 
-app.get('/health', (_req, res) => res.json({ ok: true, service: 'ListingForge AI', model: MODEL }));
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'ListingForge AI', model: MODEL, openaiConfigured: Boolean(client) }));
+
+app.get('/', (_req, res) => res.json({ service: 'ListingForge AI', status: 'online', health: '/health', endpoints: ['/api/generate', '/api/bulk', '/api/jobs/:id', '/api/jobs/:id/results'] }));
 
 app.post('/api/generate', async (req, res) => {
   try {
