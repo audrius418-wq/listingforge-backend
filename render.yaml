@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: listingforge-ai-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-6-luna
+      - key: MAX_ROWS
+        value: "1000"
+      - key: CONCURRENCY
+        value: "5"
+      - key: MAX_RETRIES
+        value: "3"
