@@ -12,8 +12,8 @@ const MAX_RETRIES = Math.max(0, Number(process.env.MAX_RETRIES || 3));
 const MODEL = process.env.OPENAI_MODEL || 'gpt-6-luna';
 const jobs = new Map();
 
-if (!process.env.OPENAI_API_KEY) console.warn('OPENAI_API_KEY is not set. AI requests will fail until it is configured.');
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+if (!client) console.warn('OPENAI_API_KEY is not set. AI requests will fail until it is configured.');
 
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
@@ -27,6 +27,7 @@ const transient = err => {
 function cleanText(v) { return String(v ?? '').trim(); }
 
 async function generateOne(item, platform, language) {
+  if (!client) throw new Error('OPENAI_API_KEY is not configured on the server');
   const name = cleanText(item.name || item.title || item.product_name);
   const details = cleanText(item.details || item.description || item.product_details || JSON.stringify(item));
   if (!name) throw new Error('Missing product name');
